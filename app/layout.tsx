@@ -18,7 +18,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "コンシェルジュAPP（デジOM）",
+  title: "コンシェルジュAPP",
   description:
     "Searchから Fitへ。回答から解決へ。ユーザー・車両・利用状況を理解し、必要な情報や次の行動を最適な形で届ける次世代の顧客接点デモ。",
 };

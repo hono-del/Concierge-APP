@@ -141,7 +141,7 @@ export default function DemoEntryPage() {
 
         <div className="relative z-10 mx-auto max-w-2xl text-center">
           <span className="inline-block rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-white/80 backdrop-blur-sm">
-            コンシェルジュAPP（デジOM）
+            コンシェルジュAPP
           </span>
           <h1 className="mt-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
             Search から Fit へ。
