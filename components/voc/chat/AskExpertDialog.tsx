@@ -13,6 +13,7 @@ import { Input } from "@/components/voc/ui/input";
 import { Label } from "@/components/voc/ui/label";
 import { Textarea } from "@/components/voc/ui/textarea";
 import { submitExpertQuestion, type ExpertQuestionDraftInput } from "@/lib/voc/actions/chat-actions";
+import { saveLocalQuestion } from "@/lib/voc/client-store";
 
 interface AskExpertDialogProps {
   open: boolean;
@@ -35,6 +36,18 @@ export function AskExpertDialog({ open, draft, onOpenChange, onPosted }: AskExpe
     setPosting(true);
     try {
       const res = await submitExpertQuestion(form);
+      // Vercelのサーバーレス環境でインスタンス間共有できないため localStorage にも保存
+      saveLocalQuestion({
+        id: res.id,
+        title: form.title,
+        vehicleModel: form.vehicleModel,
+        symptoms: form.symptoms,
+        conditions: form.conditions,
+        alreadyChecked: form.alreadyChecked,
+        questionText: form.questionText,
+        tags: form.tags,
+        rewardPoints: form.rewardPoints,
+      });
       onPosted(res.id);
       onOpenChange(false);
     } finally {
