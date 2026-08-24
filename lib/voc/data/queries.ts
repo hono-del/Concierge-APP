@@ -75,9 +75,11 @@ export async function listPendingExpertAnswers() {
   return store.answers
     .filter((a) => a.status === "pending")
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .map((answer) => {
-      const question = store.questions.find((q) => q.id === answer.questionId)!;
-      return { answer, question };
+    .flatMap((answer) => {
+      const question = store.questions.find((q) => q.id === answer.questionId);
+      // インスタンス間でストアが共有されない場合など、質問が見つからない回答はスキップする
+      if (!question) return [];
+      return [{ answer, question }];
     });
 }
 
