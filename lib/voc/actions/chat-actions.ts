@@ -7,7 +7,7 @@ import {
   generateExpertQuestionDraft,
   startConversation,
 } from "../ai/chat-engine";
-import { prisma } from "../prisma";
+import { store } from "../data/store";
 import type { ChatContext, KnowledgeCategory } from "../types";
 
 export async function postChatMessage(text: string, context: ChatContext) {
@@ -38,19 +38,25 @@ export interface ExpertQuestionDraftInput {
 }
 
 export async function submitExpertQuestion(draft: ExpertQuestionDraftInput) {
-  const created = await prisma.expertQuestion.create({
-    data: {
-      title: draft.title,
-      vehicleModel: draft.vehicleModel,
-      symptomsJson: JSON.stringify(draft.symptoms),
-      conditionsJson: JSON.stringify(draft.conditions),
-      alreadyCheckedJson: JSON.stringify(draft.alreadyChecked),
-      questionText: draft.questionText,
-      tagsJson: JSON.stringify(draft.tags),
-      rewardPoints: draft.rewardPoints,
-      status: "open",
-    },
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  store.questions.unshift({
+    id,
+    title: draft.title,
+    vehicleModel: draft.vehicleModel,
+    symptoms: draft.symptoms,
+    conditions: draft.conditions,
+    alreadyChecked: draft.alreadyChecked,
+    questionText: draft.questionText,
+    tags: draft.tags,
+    rewardPoints: draft.rewardPoints,
+    authorId: null,
+    status: "open",
+    createdAt: now,
+    answerCount: 0,
   });
+
   revalidatePath("/community");
-  return { id: created.id };
+  return { id };
 }

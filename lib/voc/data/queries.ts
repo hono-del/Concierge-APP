@@ -1,4 +1,9 @@
-import { prisma } from "../prisma";
+/**
+ * データ読み取り層 — インメモリストアから取得
+ * Prisma/SQLiteへの依存を除去し、Vercel含むあらゆる環境で動作する。
+ */
+
+import { store } from "./store";
 import type {
   Contributor,
   ExpertQuestion,
@@ -7,144 +12,101 @@ import type {
   RawVocItem,
   VocSource,
 } from "../types";
-import {
-  mapContributor,
-  mapExpertAnswer,
-  mapExpertQuestion,
-  mapKnowledgeItem,
-  mapRawVoc,
-  mapSource,
-} from "./mappers";
 
 export async function listSources(): Promise<VocSource[]> {
-  const rows = await prisma.source.findMany({ orderBy: { createdAt: "asc" } });
-  return rows.map(mapSource);
+  return [...store.sources].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 export async function getSource(id: string): Promise<VocSource | null> {
-  const row = await prisma.source.findUnique({ where: { id } });
-  return row ? mapSource(row) : null;
+  return store.sources.find((s) => s.id === id) ?? null;
 }
 
 export async function listRawVocBySource(sourceId: string): Promise<RawVocItem[]> {
-  const rows = await prisma.rawVoc.findMany({
-    where: { sourceId },
-    include: { knowledge: { select: { id: true } } },
-    orderBy: { collectedAt: "desc" },
-  });
-  return rows.map(mapRawVoc);
+  return store.rawVocs
+    .filter((r) => r.sourceId === sourceId)
+    .sort((a, b) => b.collectedAt.localeCompare(a.collectedAt));
 }
 
 export async function listRawVoc(): Promise<RawVocItem[]> {
-  const rows = await prisma.rawVoc.findMany({
-    include: { knowledge: { select: { id: true } } },
-    orderBy: { collectedAt: "desc" },
-  });
-  return rows.map(mapRawVoc);
+  return [...store.rawVocs].sort((a, b) => b.collectedAt.localeCompare(a.collectedAt));
 }
 
 export async function getRawVoc(
   id: string
 ): Promise<{ raw: RawVocItem; source: VocSource; knowledge: KnowledgeItem | null } | null> {
-  const row = await prisma.rawVoc.findUnique({
-    where: { id },
-    include: { knowledge: true, source: true },
-  });
-  if (!row) return null;
-  return {
-    raw: mapRawVoc(row),
-    source: mapSource(row.source),
-    knowledge: row.knowledge ? mapKnowledgeItem(row.knowledge) : null,
-  };
+  const raw = store.rawVocs.find((r) => r.id === id);
+  if (!raw) return null;
+  const source = store.sources.find((s) => s.id === raw.sourceId);
+  if (!source) return null;
+  const knowledge = store.knowledge.find((k) => k.rawVocId === id) ?? null;
+  return { raw, source, knowledge };
 }
 
 export async function listKnowledge(): Promise<KnowledgeItem[]> {
-  const rows = await prisma.knowledgeItem.findMany({ orderBy: { createdAt: "desc" } });
-  return rows.map(mapKnowledgeItem);
+  return [...store.knowledge].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function getKnowledge(id: string): Promise<KnowledgeItem | null> {
-  const row = await prisma.knowledgeItem.findUnique({ where: { id } });
-  return row ? mapKnowledgeItem(row) : null;
+  return store.knowledge.find((k) => k.id === id) ?? null;
 }
 
 export async function listContributors(): Promise<Contributor[]> {
-  const rows = await prisma.contributor.findMany({ orderBy: { points: "desc" } });
-  return rows.map(mapContributor);
+  return [...store.contributors].sort((a, b) => b.points - a.points);
 }
 
 export async function getContributor(id: string): Promise<Contributor | null> {
-  const row = await prisma.contributor.findUnique({ where: { id } });
-  return row ? mapContributor(row) : null;
+  return store.contributors.find((c) => c.id === id) ?? null;
 }
 
 export async function listExpertQuestions(): Promise<ExpertQuestion[]> {
-  const rows = await prisma.expertQuestion.findMany({
-    include: { answers: { select: { id: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-  return rows.map(mapExpertQuestion);
+  return [...store.questions].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function getExpertQuestion(id: string): Promise<ExpertQuestionDetail | null> {
-  const row = await prisma.expertQuestion.findUnique({
-    where: { id },
-    include: {
-      answers: {
-        include: { contributor: true },
-        orderBy: { createdAt: "asc" },
-      },
-    },
-  });
-  if (!row) return null;
-  return {
-    ...mapExpertQuestion(row),
-    answers: row.answers.map(mapExpertAnswer),
-  };
+  const q = store.questions.find((q) => q.id === id);
+  if (!q) return null;
+  const answers = store.answers.filter((a) => a.questionId === id).sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt)
+  );
+  return { ...q, answers };
 }
 
 export async function listPendingExpertAnswers() {
-  const rows = await prisma.expertAnswer.findMany({
-    where: { status: "pending" },
-    include: { contributor: true, question: true },
-    orderBy: { createdAt: "asc" },
-  });
-  return rows.map((row) => ({
-    answer: mapExpertAnswer(row),
-    question: mapExpertQuestion(row.question),
-  }));
+  return store.answers
+    .filter((a) => a.status === "pending")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((answer) => {
+      const question = store.questions.find((q) => q.id === answer.questionId)!;
+      return { answer, question };
+    });
 }
 
-/** Review Workflow詳細（要件 #17）：Question / Answer / Contributorをまとめて取得する */
 export async function getExpertAnswerDetail(answerId: string) {
-  const row = await prisma.expertAnswer.findUnique({
-    where: { id: answerId },
-    include: { contributor: true, question: true },
-  });
-  if (!row) return null;
-  return {
-    answer: mapExpertAnswer(row),
-    question: mapExpertQuestion(row.question),
-  };
+  const answer = store.answers.find((a) => a.id === answerId);
+  if (!answer) return null;
+  const question = store.questions.find((q) => q.id === answer.questionId);
+  if (!question) return null;
+  return { answer, question };
 }
 
-/** Similar Knowledge（要件 #17）：同カテゴリの承認済みKnowledgeを類似事例として提示する */
-export async function listKnowledgeByCategory(category: string, limit = 3): Promise<KnowledgeItem[]> {
-  const rows = await prisma.knowledgeItem.findMany({
-    where: { category, status: "approved" },
-    orderBy: { trustScore: "desc" },
-    take: limit,
-  });
-  return rows.map(mapKnowledgeItem);
+export async function listKnowledgeByCategory(
+  category: string,
+  limit = 3
+): Promise<KnowledgeItem[]> {
+  return store.knowledge
+    .filter((k) => k.category === category && k.status === "approved")
+    .sort((a, b) => b.trust.score - a.trust.score)
+    .slice(0, limit);
 }
 
-/** Official Information（要件 #17）：同カテゴリの公式情報を提示する */
-export async function getOfficialKnowledgeByCategory(category: string): Promise<KnowledgeItem | null> {
-  const row = await prisma.knowledgeItem.findFirst({
-    where: { category, sourceType: "official" },
-    orderBy: { trustScore: "desc" },
-  });
-  return row ? mapKnowledgeItem(row) : null;
+export async function getOfficialKnowledgeByCategory(
+  category: string
+): Promise<KnowledgeItem | null> {
+  return (
+    store.knowledge
+      .filter((k) => k.category === category && k.source.type === "official")
+      .sort((a, b) => b.trust.score - a.trust.score)[0] ?? null
+  );
 }
 
 export interface DashboardStats {
@@ -157,30 +119,22 @@ export interface DashboardStats {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const [total, official, expert, pendingReview, sources, allKnowledge] = await Promise.all([
-    prisma.knowledgeItem.count(),
-    prisma.knowledgeItem.count({ where: { sourceType: "official" } }),
-    prisma.knowledgeItem.count({ where: { sourceType: "expert" } }),
-    prisma.knowledgeItem.count({ where: { status: "review" } }),
-    prisma.source.count(),
-    prisma.knowledgeItem.count({ where: { sourceType: { notIn: ["official"] } } }),
-  ]);
-  return {
-    totalKnowledge: total,
-    officialKnowledge: official,
-    vocKnowledge: allKnowledge - expert,
-    expertKnowledge: expert,
-    pendingReview,
-    sources,
-  };
+  const k = store.knowledge;
+  const total = k.length;
+  const official = k.filter((i) => i.source.type === "official").length;
+  const expert = k.filter((i) => i.source.type === "expert").length;
+  const pendingReview = k.filter((i) => i.status === "review").length;
+  const sources = store.sources.length;
+  const vocKnowledge = k.filter((i) => i.source.type !== "official").length - expert;
+  return { totalKnowledge: total, officialKnowledge: official, vocKnowledge, expertKnowledge: expert, pendingReview, sources };
 }
 
 export async function getKnowledgeByCategory(): Promise<{ category: string; count: number }[]> {
-  const rows = await prisma.knowledgeItem.groupBy({
-    by: ["category"],
-    _count: { category: true },
-  });
-  return rows
-    .map((r) => ({ category: r.category, count: r._count.category }))
+  const map = new Map<string, number>();
+  for (const k of store.knowledge) {
+    map.set(k.category, (map.get(k.category) ?? 0) + 1);
+  }
+  return [...map.entries()]
+    .map(([category, count]) => ({ category, count }))
     .sort((a, b) => b.count - a.count);
 }

@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { collectFromUrl } from "../adapters/registry";
 import { getMockStructuredResult } from "../ai/structuring";
-import { toKnowledgeCreateData } from "../data/mappers";
-import { prisma } from "../prisma";
+import { store } from "../data/store";
 import type { KnowledgeItem } from "../types";
 
 export interface CollectSourceResult {
@@ -19,34 +18,35 @@ export interface CollectSourceResult {
  * Live Collectionを試行し、失敗時はDemo Snapshotへ自動フォールバックする。
  */
 export async function collectSource(sourceId: string): Promise<CollectSourceResult> {
-  const source = await prisma.source.findUnique({ where: { id: sourceId } });
+  const source = store.sources.find((s) => s.id === sourceId);
   if (!source) throw new Error("Source not found");
 
   const result = await collectFromUrl(source.url);
 
+  const now = new Date().toISOString();
   let newCount = 0;
+
   for (const item of result.items) {
-    const exists = await prisma.rawVoc.findFirst({ where: { sourceUrl: item.sourceUrl } });
+    const exists = store.rawVocs.some((r) => r.sourceUrl === item.sourceUrl);
     if (exists) continue;
-    await prisma.rawVoc.create({
-      data: {
-        sourceId,
-        rawTitle: item.rawTitle,
-        rawText: item.rawText,
-        sourceName: item.sourceName,
-        sourceUrl: item.sourceUrl,
-        publishedAt: item.publishedAt ? new Date(item.publishedAt) : new Date(),
-        status: "new",
-      },
+    store.rawVocs.unshift({
+      id: crypto.randomUUID(),
+      sourceId,
+      rawTitle: item.rawTitle,
+      rawText: item.rawText,
+      sourceName: item.sourceName,
+      sourceUrl: item.sourceUrl,
+      publishedAt: item.publishedAt ?? now,
+      status: "new",
+      collectedAt: now,
+      hasKnowledge: false,
     });
     newCount++;
   }
 
-  const totalCount = await prisma.rawVoc.count({ where: { sourceId } });
-  await prisma.source.update({
-    where: { id: sourceId },
-    data: { lastCollectedAt: new Date(), collectedItems: totalCount },
-  });
+  const totalCount = store.rawVocs.filter((r) => r.sourceId === sourceId).length;
+  source.lastCollectedAt = now;
+  source.collectedItems = totalCount;
 
   revalidatePath("/studio/sources");
   revalidatePath("/studio");
@@ -72,34 +72,44 @@ function buildGenericFallback(raw: {
     source: { type: "community", title: raw.sourceName, url: raw.sourceUrl },
     trust: { score: 40, reason: ["未検証の投稿（自動抽出）"], officialCorroboration: false, multipleSourceSupport: false },
     safety: { level: "low", requiresOfficialConfirmation: false },
+    rawVocId: null,
   };
 }
 
 /**
  * AI Structuring（要件 #7）。Mock Modeでは事前定義の構造化結果を返す。
- * 対応する事前定義がない場合（Live Collectionで取得した未知のVoCなど）は簡易フォールバックを生成する。
  */
 export async function structureKnowledge(rawVocId: string): Promise<{ id: string }> {
-  const raw = await prisma.rawVoc.findUnique({ where: { id: rawVocId } });
+  const raw = store.rawVocs.find((r) => r.id === rawVocId);
   if (!raw) throw new Error("RawVoc not found");
 
-  const existing = await prisma.knowledgeItem.findUnique({ where: { rawVocId } });
+  const existing = store.knowledge.find((k) => k.rawVocId === rawVocId);
   if (existing) return { id: existing.id };
 
   const mock = getMockStructuredResult(rawVocId);
   const base = mock ?? buildGenericFallback(raw);
 
-  const created = await prisma.knowledgeItem.create({
-    data: toKnowledgeCreateData(base, "review"),
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  store.knowledge.unshift({
+    ...base,
+    id,
+    rawVocId,
+    status: "review",
+    createdAt: now,
+    updatedAt: now,
   });
 
-  await prisma.rawVoc.update({ where: { id: rawVocId }, data: { status: "structured" } });
+  // RawVocのステータス更新
+  raw.status = "structured";
+  raw.hasKnowledge = true;
 
   revalidatePath(`/studio/collection/${rawVocId}`);
   revalidatePath("/studio");
-  revalidatePath(`/studio/knowledge/${created.id}`);
+  revalidatePath(`/studio/knowledge/${id}`);
 
-  return { id: created.id };
+  return { id };
 }
 
 export interface KnowledgeUpdateInput {
@@ -110,22 +120,20 @@ export interface KnowledgeUpdateInput {
 
 /** Knowledge Detail画面での編集（要件 #8：編集可能にする） */
 export async function updateKnowledge(id: string, input: KnowledgeUpdateInput) {
-  await prisma.knowledgeItem.update({
-    where: { id },
-    data: {
-      issueTitle: input.issueTitle,
-      status: input.status,
-      tipsJson: input.tips ? JSON.stringify(input.tips) : undefined,
-    },
-  });
+  const k = store.knowledge.find((k) => k.id === id);
+  if (!k) throw new Error("Knowledge not found");
+  if (input.issueTitle !== undefined) k.issueTitle = input.issueTitle;
+  if (input.status !== undefined) k.status = input.status;
+  if (input.tips !== undefined) k.tips = input.tips;
+  k.updatedAt = new Date().toISOString();
+
   revalidatePath(`/studio/knowledge/${id}`);
   revalidatePath("/studio");
 }
 
 export async function toggleSourceStatus(sourceId: string) {
-  const source = await prisma.source.findUnique({ where: { id: sourceId } });
+  const source = store.sources.find((s) => s.id === sourceId);
   if (!source) throw new Error("Source not found");
-  const nextStatus = source.status === "disabled" ? "active" : "disabled";
-  await prisma.source.update({ where: { id: sourceId }, data: { status: nextStatus } });
+  source.status = source.status === "disabled" ? "active" : "disabled";
   revalidatePath("/studio/sources");
 }

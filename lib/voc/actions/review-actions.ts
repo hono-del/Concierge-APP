@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { buildStructuredFromExpertAnswer } from "../ai/structuring";
-import { toKnowledgeCreateData } from "../data/mappers";
-import { prisma } from "../prisma";
+import { store } from "../data/store";
 
 const KNOWLEDGE_ACCEPT_REWARD_POINTS = 100;
 
@@ -12,68 +11,68 @@ const KNOWLEDGE_ACCEPT_REWARD_POINTS = 100;
  * ExpertAnswerをAIで構造化し、承認済みKnowledgeItemとして追加。回答者へポイントを付与する。
  */
 export async function acceptAnswer(answerId: string, editedText?: string) {
-  const answer = await prisma.expertAnswer.findUnique({
-    where: { id: answerId },
-    include: { question: true, contributor: true },
-  });
+  const answer = store.answers.find((a) => a.id === answerId);
   if (!answer) throw new Error("Answer not found");
+
+  const question = store.questions.find((q) => q.id === answer.questionId);
+  if (!question) throw new Error("Question not found");
+
+  const contributor = store.contributors.find((c) => c.id === answer.contributorId);
+  if (!contributor) throw new Error("Contributor not found");
 
   const finalText = editedText?.trim() || answer.answerText;
   const base = buildStructuredFromExpertAnswer({
-    questionTitle: answer.question.title,
-    questionVehicleModel: answer.question.vehicleModel,
-    symptoms: JSON.parse(answer.question.symptomsJson) as string[],
-    conditions: JSON.parse(answer.question.conditionsJson) as string[],
+    questionTitle: question.title,
+    questionVehicleModel: question.vehicleModel,
+    symptoms: question.symptoms,
+    conditions: question.conditions,
     answerText: finalText,
-    contributorName: answer.contributor.name,
-    contributorBadge: answer.contributor.badge,
+    contributorName: contributor.name,
+    contributorBadge: contributor.badge,
   });
 
-  const knowledge = await prisma.knowledgeItem.create({
-    data: toKnowledgeCreateData(base, "approved"),
+  const knowledgeId = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  store.knowledge.unshift({
+    ...base,
+    id: knowledgeId,
+    status: "approved",
+    rawVocId: null,
+    createdAt: now,
+    updatedAt: now,
   });
 
-  await prisma.expertAnswer.update({
-    where: { id: answerId },
-    data: {
-      status: editedText ? "edited_accepted" : "accepted",
-      answerText: finalText,
-      knowledgeItem: { connect: { id: knowledge.id } },
-    },
-  });
+  // Answer更新
+  answer.status = editedText ? "edited_accepted" : "accepted";
+  answer.answerText = finalText;
+  answer.knowledgeItemId = knowledgeId;
 
-  await prisma.expertQuestion.update({
-    where: { id: answer.questionId },
-    data: { status: "resolved" },
-  });
+  // Question解決
+  question.status = "resolved";
 
-  const contributor = await prisma.contributor.update({
-    where: { id: answer.contributorId },
-    data: {
-      points: { increment: KNOWLEDGE_ACCEPT_REWARD_POINTS },
-      acceptedAnswers: { increment: 1 },
-    },
-  });
+  // Contributorにポイント付与
+  contributor.points += KNOWLEDGE_ACCEPT_REWARD_POINTS;
+  contributor.acceptedAnswers += 1;
 
   revalidatePath("/studio/review");
   revalidatePath("/studio");
-  revalidatePath(`/studio/knowledge/${knowledge.id}`);
+  revalidatePath(`/studio/knowledge/${knowledgeId}`);
   revalidatePath("/community");
   revalidatePath(`/community/questions/${answer.questionId}`);
-  revalidatePath(`/community/contributors/${contributor.id}`);
 
   return {
-    knowledgeId: knowledge.id,
+    knowledgeId,
     contributor: { id: contributor.id, name: contributor.name, points: contributor.points },
     rewardPoints: KNOWLEDGE_ACCEPT_REWARD_POINTS,
   };
 }
 
 export async function rejectAnswer(answerId: string) {
-  const answer = await prisma.expertAnswer.update({
-    where: { id: answerId },
-    data: { status: "rejected" },
-  });
+  const answer = store.answers.find((a) => a.id === answerId);
+  if (!answer) throw new Error("Answer not found");
+  answer.status = "rejected";
+
   revalidatePath("/studio/review");
   revalidatePath("/studio");
   return { id: answer.id };
