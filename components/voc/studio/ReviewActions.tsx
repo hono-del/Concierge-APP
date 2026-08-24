@@ -8,7 +8,7 @@ import { Button } from "@/components/voc/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/voc/ui/dialog";
 import { Textarea } from "@/components/voc/ui/textarea";
 import { acceptAnswer, rejectAnswer } from "@/lib/voc/actions/review-actions";
-import { markLocalAnswerAccepted } from "@/lib/voc/client-store";
+import { markLocalAnswerAccepted, saveLocalKnowledge } from "@/lib/voc/client-store";
 
 interface ReviewActionsProps {
   answerId: string;
@@ -33,6 +33,8 @@ export function ReviewActions({ answerId, answerText, contributorName }: ReviewA
       const res = await acceptAnswer(answerId, edited);
       // localStorage の回答を accepted に更新して Pending から除外する
       markLocalAnswerAccepted(answerId);
+      // 作成されたKnowledgeItemも localStorage に保存（別インスタンスでもRecent Knowledgeに表示するため）
+      saveLocalKnowledge(res.knowledge);
       setResult({ knowledgeId: res.knowledgeId, points: res.rewardPoints });
       // router.refresh は不要（Dashboard 遷移時に再フェッチされる）
     } finally {

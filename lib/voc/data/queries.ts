@@ -4,6 +4,7 @@
  */
 
 import { store } from "./store";
+import { computeDashboardStats, computeKnowledgeByCategory, type DashboardStats } from "../dashboard-utils";
 import type {
   Contributor,
   ExpertQuestion,
@@ -111,32 +112,12 @@ export async function getOfficialKnowledgeByCategory(
   );
 }
 
-export interface DashboardStats {
-  totalKnowledge: number;
-  officialKnowledge: number;
-  vocKnowledge: number;
-  expertKnowledge: number;
-  pendingReview: number;
-  sources: number;
-}
+export type { DashboardStats };
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const k = store.knowledge;
-  const total = k.length;
-  const official = k.filter((i) => i.source.type === "official").length;
-  const expert = k.filter((i) => i.source.type === "expert").length;
-  const pendingReview = k.filter((i) => i.status === "review").length;
-  const sources = store.sources.length;
-  const vocKnowledge = k.filter((i) => i.source.type !== "official").length - expert;
-  return { totalKnowledge: total, officialKnowledge: official, vocKnowledge, expertKnowledge: expert, pendingReview, sources };
+  return computeDashboardStats(store.knowledge, store.sources.length);
 }
 
 export async function getKnowledgeByCategory(): Promise<{ category: string; count: number }[]> {
-  const map = new Map<string, number>();
-  for (const k of store.knowledge) {
-    map.set(k.category, (map.get(k.category) ?? 0) + 1);
-  }
-  return [...map.entries()]
-    .map(([category, count]) => ({ category, count }))
-    .sort((a, b) => b.count - a.count);
+  return computeKnowledgeByCategory(store.knowledge);
 }

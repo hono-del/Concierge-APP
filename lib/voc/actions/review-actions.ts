@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { buildStructuredFromExpertAnswer } from "../ai/structuring";
 import { store } from "../data/store";
+import type { KnowledgeItem } from "../types";
 
 const KNOWLEDGE_ACCEPT_REWARD_POINTS = 100;
 
@@ -34,14 +35,16 @@ export async function acceptAnswer(answerId: string, editedText?: string) {
   const knowledgeId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  store.knowledge.unshift({
+  const knowledge: KnowledgeItem = {
     ...base,
     id: knowledgeId,
     status: "approved",
     rawVocId: null,
     createdAt: now,
     updatedAt: now,
-  });
+  };
+
+  store.knowledge.unshift(knowledge);
 
   // Answer更新
   answer.status = editedText ? "edited_accepted" : "accepted";
@@ -63,6 +66,7 @@ export async function acceptAnswer(answerId: string, editedText?: string) {
 
   return {
     knowledgeId,
+    knowledge,
     contributor: { id: contributor.id, name: contributor.name, points: contributor.points },
     rewardPoints: KNOWLEDGE_ACCEPT_REWARD_POINTS,
   };

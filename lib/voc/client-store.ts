@@ -4,11 +4,12 @@
  * ユーザー操作で生成されたデータはブラウザに保存して永続化する。
  */
 
-import type { ExpertQuestion } from "./types";
+import type { ExpertQuestion, KnowledgeItem } from "./types";
 
 const KEYS = {
   questions: "voc_local_questions",
   answers: "voc_local_answers",
+  knowledge: "voc_local_knowledge",
 } as const;
 
 function read<T>(key: string): T[] {
@@ -121,4 +122,23 @@ export function getAcceptedLocalAnswerIds(): Set<string> {
       .filter((a) => a.status === "accepted")
       .map((a) => a.id)
   );
+}
+
+// ─── Knowledge ──────────────────────────────────────────────────────────────
+
+/** Review Workflowで採用されたKnowledgeItemを保存する */
+export function saveLocalKnowledge(k: KnowledgeItem) {
+  const existing = read<KnowledgeItem>(KEYS.knowledge);
+  if (existing.some((e) => e.id === k.id)) return;
+  write(KEYS.knowledge, [k, ...existing]);
+}
+
+/** localStorage に保存されたKnowledgeItemを返す */
+export function getLocalKnowledgeItems(): KnowledgeItem[] {
+  return read<KnowledgeItem>(KEYS.knowledge);
+}
+
+/** IDを指定して localStorage のKnowledgeItemを返す */
+export function getLocalKnowledgeItem(id: string): KnowledgeItem | null {
+  return getLocalKnowledgeItems().find((k) => k.id === id) ?? null;
 }
