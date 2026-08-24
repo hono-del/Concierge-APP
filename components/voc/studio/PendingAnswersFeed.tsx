@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Award, Clock } from "lucide-react";
 import Link from "next/link";
 import { getResolvedLocalAnswerIds, getLocalAnswers, type LocalAnswer } from "@/lib/voc/client-store";
@@ -37,7 +37,7 @@ interface PendingAnswersFeedProps {
 export function PendingAnswersFeed({ initialItems }: PendingAnswersFeedProps) {
   const [items, setItems] = useState<PendingItem[]>(initialItems);
 
-  useEffect(() => {
+  const recompute = useCallback(() => {
     const resolvedIds = getResolvedLocalAnswerIds();
     const localPending = getLocalAnswers().map(toItem);
 
@@ -50,6 +50,18 @@ export function PendingAnswersFeed({ initialItems }: PendingAnswersFeedProps) {
 
     setItems([...newOnes, ...serverFiltered]);
   }, [initialItems]);
+
+  useEffect(() => {
+    recompute();
+    // クライアントサイドナビゲーションでコンポーネントが再マウントされず
+    // 古い状態のままになるケースに備え、画面へ戻ってきた時にも再計算する
+    window.addEventListener("focus", recompute);
+    document.addEventListener("visibilitychange", recompute);
+    return () => {
+      window.removeEventListener("focus", recompute);
+      document.removeEventListener("visibilitychange", recompute);
+    };
+  }, [recompute]);
 
   if (items.length === 0) {
     return (

@@ -2,7 +2,7 @@
 
 import { AlertCircle, BookMarked, Database, MessageSquareText, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { SourceBadge } from "@/components/voc/SourceBadge";
 import { KpiCard } from "@/components/voc/studio/KpiCard";
 import { Badge } from "@/components/voc/ui/badge";
@@ -29,9 +29,14 @@ export function DashboardOverview({
   const [categories, setCategories] = useState(initialCategories);
   const [recentKnowledge, setRecentKnowledge] = useState(initialRecentKnowledge);
 
-  useEffect(() => {
+  const recompute = useCallback(() => {
     const local = getLocalKnowledgeItems();
-    if (local.length === 0) return;
+    if (local.length === 0) {
+      setRecentKnowledge(initialRecentKnowledge);
+      setStats(initialStats);
+      setCategories(initialCategories);
+      return;
+    }
 
     const existingIds = new Set(initialRecentKnowledge.map((k) => k.id));
     const newOnes = local.filter((k) => !existingIds.has(k.id));
@@ -44,7 +49,19 @@ export function DashboardOverview({
     setRecentKnowledge(merged);
     setStats(computeDashboardStats(merged, initialStats.sources));
     setCategories(computeKnowledgeByCategory(merged));
-  }, [initialRecentKnowledge, initialStats]);
+  }, [initialRecentKnowledge, initialStats, initialCategories]);
+
+  useEffect(() => {
+    recompute();
+    // クライアントサイドナビゲーションでコンポーネントが再マウントされず
+    // 古い状態のままになるケースに備え、画面へ戻ってきた時にも再計算する
+    window.addEventListener("focus", recompute);
+    document.addEventListener("visibilitychange", recompute);
+    return () => {
+      window.removeEventListener("focus", recompute);
+      document.removeEventListener("visibilitychange", recompute);
+    };
+  }, [recompute]);
 
   const maxCategoryCount = Math.max(...categories.map((c) => c.count), 1);
 

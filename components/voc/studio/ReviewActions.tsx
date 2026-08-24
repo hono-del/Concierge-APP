@@ -56,7 +56,14 @@ export function ReviewActions({ answerId, answerText, contributorName }: ReviewA
   }
 
   if (rejected) {
-    return <p className="text-sm text-slate-400">この回答は不採用としました。</p>;
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-slate-400">この回答は不採用としました。</p>
+        <Button size="sm" variant="outline" onClick={() => router.push("/studio/review")}>
+          Review一覧へ戻る
+        </Button>
+      </div>
+    );
   }
 
   return (
