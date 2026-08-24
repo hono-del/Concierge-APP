@@ -1,0 +1,136 @@
+// VoCベースナレッジ構築モック — データモデル
+// 学習・デモ用のため、ネストしたオブジェクト/配列はJSON文字列としてTEXT列に保持する
+// （SQLiteはネイティブJSON型を持たないため）。
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// VoC収集対象サイト（みんカラ / レビューサイト / ブログ 等）
+model Source {
+  id              String    @id @default(cuid())
+  name            String
+  url             String
+  sourceType      String // qa | blog | video | community | dealer | expert | official
+  vehicleModel    String    @default("NX")
+  status          String    @default("active") // active | disabled | error
+  lastCollectedAt DateTime?
+  collectedItems  Int       @default(0)
+  createdAt       DateTime  @default(now())
+  rawVocs         RawVoc[]
+}
+
+/// Sourceから収集された未構造化のVoC原文
+model RawVoc {
+  id          String         @id @default(cuid())
+  sourceId    String
+  source      Source         @relation(fields: [sourceId], references: [id])
+  rawTitle    String
+  rawText     String
+  sourceName  String
+  sourceUrl   String
+  publishedAt DateTime?
+  status      String         @default("new") // new | processing | structured | duplicate | rejected
+  collectedAt DateTime       @default(now())
+  knowledge   KnowledgeItem?
+}
+
+/// AIによって構造化されたナレッジ（VoC由来 / Official / Expert由来を問わず統一スキーマ）
+model KnowledgeItem {
+  id       String  @id @default(cuid())
+  rawVocId String? @unique
+  rawVoc   RawVoc? @relation(fields: [rawVocId], references: [id])
+
+  vehicleMaker      String @default("LEXUS")
+  vehicleModel      String @default("NX")
+  vehicleModelYear  String?
+  vehicleGrade      String?
+  vehiclePowertrain String?
+
+  category   String // door | battery | infotainment | warning | noise | charging | adas | other
+  issueTitle String
+
+  symptomsJson   String // string[]
+  conditionsJson String // { weather?, temperature?, vehicleState?, frequency?, timing? }
+  causesJson     String // { label, confidence }[]
+  checksJson     String // { order, action, reason? }[]
+  resolutionsJson String // { action, outcome?, evidenceCount? }[]
+  tipsJson       String // string[]
+
+  sourceType   String // official | community | blog | video | dealer | expert
+  sourceTitle  String
+  sourceUrl    String?
+  sourceAuthor String?
+  publishedAt  DateTime?
+
+  trustScore            Int
+  trustReasonJson       String // string[]
+  officialCorroboration Boolean @default(false)
+  multipleSourceSupport Boolean @default(false)
+
+  safetyLevel                  String  @default("low") // low | medium | high
+  requiresOfficialConfirmation Boolean @default(false)
+  safetyNotesJson               String?
+
+  status String @default("draft") // draft | review | approved | rejected
+
+  expertAnswerId String?       @unique
+  expertAnswer   ExpertAnswer? @relation(fields: [expertAnswerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Expert Communityの回答者・貢献者
+model Contributor {
+  id              String   @id @default(cuid())
+  name            String
+  badge           String // NX Owner | Dealer Staff | Mechanic | EV Expert | Top Contributor
+  vehicleModel    String?
+  knowledgeLevel  Int      @default(1)
+  points          Int      @default(0)
+  acceptedAnswers Int      @default(0)
+  helpfulRate     Int      @default(80)
+  createdAt       DateTime @default(now())
+
+  questions ExpertQuestion[]
+  answers   ExpertAnswer[]
+}
+
+/// AIがChatの会話から自動生成し、Expert Communityへ投稿された質問
+model ExpertQuestion {
+  id                 String   @id @default(cuid())
+  title              String
+  vehicleModel       String
+  symptomsJson       String // string[]
+  conditionsJson     String // string[]
+  alreadyCheckedJson String // string[]
+  questionText       String
+  tagsJson           String // string[]
+  rewardPoints       Int      @default(50)
+  authorId           String?
+  author             Contributor? @relation(fields: [authorId], references: [id])
+  status             String   @default("open") // open | answered | resolved
+  createdAt          DateTime @default(now())
+
+  answers ExpertAnswer[]
+}
+
+/// 有識者からの回答（承認されるとKnowledgeItemへ変換される）
+model ExpertAnswer {
+  id            String         @id @default(cuid())
+  questionId    String
+  question      ExpertQuestion @relation(fields: [questionId], references: [id])
+  contributorId String
+  contributor   Contributor    @relation(fields: [contributorId], references: [id])
+  answerText    String
+  status        String         @default("pending") // pending | accepted | edited_accepted | rejected
+  createdAt     DateTime       @default(now())
+
+  knowledgeItem KnowledgeItem?
+}
