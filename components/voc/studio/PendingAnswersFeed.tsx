@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Award, Clock } from "lucide-react";
 import Link from "next/link";
-import { getAcceptedLocalAnswerIds, getLocalAnswers, type LocalAnswer } from "@/lib/voc/client-store";
+import { getResolvedLocalAnswerIds, getLocalAnswers, type LocalAnswer } from "@/lib/voc/client-store";
 import { Badge } from "@/components/voc/ui/badge";
 import { Card, CardContent } from "@/components/voc/ui/card";
 import { formatRelativeDate } from "@/lib/voc/labels";
@@ -38,11 +38,11 @@ export function PendingAnswersFeed({ initialItems }: PendingAnswersFeedProps) {
   const [items, setItems] = useState<PendingItem[]>(initialItems);
 
   useEffect(() => {
-    const acceptedIds = getAcceptedLocalAnswerIds();
+    const resolvedIds = getResolvedLocalAnswerIds();
     const localPending = getLocalAnswers().map(toItem);
 
-    // サーバーデータから accepted 済みを除外
-    const serverFiltered = initialItems.filter((i) => !acceptedIds.has(i.answerId));
+    // サーバーデータから accepted / rejected 済みを除外
+    const serverFiltered = initialItems.filter((i) => !resolvedIds.has(i.answerId));
 
     // localStorage の新しい pending 回答をマージ（サーバーに既にある ID は除外）
     const existingIds = new Set(serverFiltered.map((i) => i.answerId));

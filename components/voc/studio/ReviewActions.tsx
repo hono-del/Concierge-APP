@@ -8,7 +8,7 @@ import { Button } from "@/components/voc/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/voc/ui/dialog";
 import { Textarea } from "@/components/voc/ui/textarea";
 import { acceptAnswer, rejectAnswer } from "@/lib/voc/actions/review-actions";
-import { markLocalAnswerAccepted, saveLocalKnowledge } from "@/lib/voc/client-store";
+import { markLocalAnswerAccepted, markLocalAnswerRejected, saveLocalKnowledge } from "@/lib/voc/client-store";
 
 interface ReviewActionsProps {
   answerId: string;
@@ -46,6 +46,8 @@ export function ReviewActions({ answerId, answerText, contributorName }: ReviewA
     setBusy(true);
     try {
       await rejectAnswer(answerId);
+      // localStorage の回答を rejected に更新して Pending から除外する
+      markLocalAnswerRejected(answerId);
       setRejected(true);
       router.refresh();
     } finally {

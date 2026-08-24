@@ -86,7 +86,7 @@ export interface LocalAnswer {
   contributorKnowledgeLevel: number;
   contributorPoints: number;
   answerText: string;
-  status: "pending" | "accepted";
+  status: "pending" | "accepted" | "rejected";
   createdAt: string;
 }
 
@@ -105,6 +105,13 @@ export function markLocalAnswerAccepted(id: string) {
   write(KEYS.answers, updated);
 }
 
+/** IDを指定して localStorage の回答ステータスを rejected に更新する */
+export function markLocalAnswerRejected(id: string) {
+  const all = read<LocalAnswer>(KEYS.answers);
+  const updated = all.map((a) => (a.id === id ? { ...a, status: "rejected" as const } : a));
+  write(KEYS.answers, updated);
+}
+
 /** localStorage に保存された回答を返す（pending のみ） */
 export function getLocalAnswers(): LocalAnswer[] {
   return read<LocalAnswer>(KEYS.answers).filter((a) => a.status === "pending");
@@ -115,11 +122,11 @@ export function getLocalAnswer(id: string): LocalAnswer | null {
   return read<LocalAnswer>(KEYS.answers).find((a) => a.id === id) ?? null;
 }
 
-/** localStorage で accepted としてマーク済みの回答IDセットを返す */
-export function getAcceptedLocalAnswerIds(): Set<string> {
+/** localStorage で accepted または rejected としてマーク済みの回答IDセットを返す（Pending一覧から除外するため） */
+export function getResolvedLocalAnswerIds(): Set<string> {
   return new Set(
     read<LocalAnswer>(KEYS.answers)
-      .filter((a) => a.status === "accepted")
+      .filter((a) => a.status === "accepted" || a.status === "rejected")
       .map((a) => a.id)
   );
 }
