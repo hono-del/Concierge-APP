@@ -1,134 +1,25 @@
-import { ArrowLeft, Award, Car, Clock } from "lucide-react";
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { AnswerForm } from "@/components/voc/community/AnswerForm";
-import { Badge } from "@/components/voc/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/voc/ui/card";
+import { QuestionDetailClient } from "@/components/voc/community/QuestionDetailClient";
 import { getExpertQuestion, listContributors } from "@/lib/voc/data/queries";
-import { formatRelativeDate } from "@/lib/voc/labels";
 
 export const dynamic = "force-dynamic";
 
-const ANSWER_STATUS_LABEL: Record<string, string> = {
-  pending: "Studio審査中",
-  accepted: "Knowledgeに採用",
-  edited_accepted: "Knowledgeに採用（編集済み）",
-  rejected: "不採用",
-};
-
-const ANSWER_STATUS_VARIANT: Record<string, "warning" | "success" | "secondary"> = {
-  pending: "warning",
-  accepted: "success",
-  edited_accepted: "success",
-  rejected: "secondary",
-};
-
 export default async function QuestionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const question = await getExpertQuestion(id);
-  if (!question) notFound();
 
-  const contributors = await listContributors();
-  const defaultContributor = contributors.find((c) => c.id === "c-tkato") ?? contributors[0];
+  // インメモリストアから検索（localhost では取得できるが Vercel 別インスタンスでは null になる場合がある）
+  const [question, contributors] = await Promise.all([
+    getExpertQuestion(id),
+    listContributors(),
+  ]);
 
+  const defaultContributor = contributors.find((c) => c.id === "c-tkato") ?? contributors[0] ?? null;
+
+  // question が null の場合は Client Component 側で localStorage からフォールバック
   return (
-    <div className="space-y-6">
-      <Link
-        href="/community"
-        className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-900"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Community Feedへ戻る
-      </Link>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="gap-1">
-              <Car className="h-3 w-3" />
-              {question.vehicleModel}
-            </Badge>
-            <span className="flex items-center gap-1 text-xs font-semibold text-amber-600">
-              <Award className="h-3.5 w-3.5" />+{question.rewardPoints}pt
-            </span>
-            <span className="flex items-center gap-1 text-[11px] text-slate-400">
-              <Clock className="h-3 w-3" />
-              {formatRelativeDate(question.createdAt)}
-            </span>
-          </div>
-          <CardTitle className="text-lg">{question.title}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-0">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{question.questionText}</p>
-
-          {question.symptoms.length > 0 && (
-            <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase text-slate-400">Symptoms</p>
-              <ul className="space-y-0.5 text-sm text-slate-700">
-                {question.symptoms.map((s, i) => (
-                  <li key={i}>・{s}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {question.conditions.length > 0 && (
-            <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase text-slate-400">Conditions</p>
-              <p className="text-sm text-slate-700">{question.conditions.join(" ・ ")}</p>
-            </div>
-          )}
-
-          {question.alreadyChecked.length > 0 && (
-            <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase text-slate-400">Already Checked</p>
-              <ul className="space-y-0.5 text-sm text-slate-700">
-                {question.alreadyChecked.map((c, i) => (
-                  <li key={i}>・{c}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-1.5">
-            {question.tags.map((tag) => (
-              <span key={tag} className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
-                #{tag}
-              </span>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Answers（{question.answers.length}）
-        </p>
-        {question.answers.map((answer) => (
-          <Card key={answer.id} className="p-4">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
-                  {answer.contributor.name.slice(0, 1)}
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{answer.contributor.name}</p>
-                  <p className="text-[11px] text-slate-400">
-                    {answer.contributor.badge} ・ Knowledge Level {answer.contributor.knowledgeLevel}
-                  </p>
-                </div>
-              </div>
-              <Badge variant={ANSWER_STATUS_VARIANT[answer.status]}>{ANSWER_STATUS_LABEL[answer.status]}</Badge>
-            </div>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{answer.answerText}</p>
-          </Card>
-        ))}
-        {question.answers.length === 0 && (
-          <p className="text-xs text-slate-400">まだ回答がありません。最初の回答者になりましょう。</p>
-        )}
-      </div>
-
-      {defaultContributor && <AnswerForm questionId={question.id} contributor={defaultContributor} />}
-    </div>
+    <QuestionDetailClient
+      serverQuestion={question}
+      id={id}
+      defaultContributor={defaultContributor}
+    />
   );
 }

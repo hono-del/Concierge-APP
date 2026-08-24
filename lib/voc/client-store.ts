@@ -46,3 +46,8 @@ export function saveLocalQuestion(q: Pick<ExpertQuestion, "id" | "title" | "vehi
 export function getLocalQuestions(): ExpertQuestion[] {
   return read<ExpertQuestion>(KEYS.questions);
 }
+
+/** IDを指定して localStorage の質問を返す */
+export function getLocalQuestion(id: string): ExpertQuestion | null {
+  return getLocalQuestions().find((q) => q.id === id) ?? null;
+}
