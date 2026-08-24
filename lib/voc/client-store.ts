@@ -85,7 +85,7 @@ export interface LocalAnswer {
   contributorKnowledgeLevel: number;
   contributorPoints: number;
   answerText: string;
-  status: "pending";
+  status: "pending" | "accepted";
   createdAt: string;
 }
 
@@ -95,6 +95,13 @@ export function saveLocalAnswer(a: LocalAnswer) {
   // 同じ ID が既にある場合は更新しない
   if (existing.some((e) => e.id === a.id)) return;
   write(KEYS.answers, [a, ...existing]);
+}
+
+/** IDを指定して localStorage の回答ステータスを accepted に更新する */
+export function markLocalAnswerAccepted(id: string) {
+  const all = read<LocalAnswer>(KEYS.answers);
+  const updated = all.map((a) => (a.id === id ? { ...a, status: "accepted" as const } : a));
+  write(KEYS.answers, updated);
 }
 
 /** localStorage に保存された回答を返す（pending のみ） */

@@ -8,6 +8,7 @@ import { Button } from "@/components/voc/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/voc/ui/dialog";
 import { Textarea } from "@/components/voc/ui/textarea";
 import { acceptAnswer, rejectAnswer } from "@/lib/voc/actions/review-actions";
+import { markLocalAnswerAccepted } from "@/lib/voc/client-store";
 
 interface ReviewActionsProps {
   answerId: string;
@@ -30,6 +31,8 @@ export function ReviewActions({ answerId, answerText, contributorName }: ReviewA
     setBusy(true);
     try {
       const res = await acceptAnswer(answerId, edited);
+      // localStorage の回答を accepted に更新して Pending から除外する
+      markLocalAnswerAccepted(answerId);
       setResult({ knowledgeId: res.knowledgeId, points: res.rewardPoints });
       router.refresh();
     } finally {
@@ -84,7 +87,7 @@ export function ReviewActions({ answerId, answerText, contributorName }: ReviewA
         </div>
       )}
 
-      <Dialog open={Boolean(result)} onOpenChange={(open) => !open && setResult(null)}>
+      <Dialog open={Boolean(result)} onOpenChange={(open) => !open && router.push("/studio")}>
         <DialogContent className="text-center">
           <DialogHeader>
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
@@ -99,11 +102,11 @@ export function ReviewActions({ answerId, answerText, contributorName }: ReviewA
             <Award className="h-5 w-5" />+{result?.points} Knowledge Points
           </p>
           <div className="mt-5 flex items-center justify-center gap-2">
-            <Button asChild size="sm">
-              <Link href={`/studio/knowledge/${result?.knowledgeId}`}>Knowledgeを見る</Link>
+            <Button onClick={() => router.push("/studio")}>
+              Dashboardで確認
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link href="/studio/review">Reviewへ戻る</Link>
+              <Link href={`/studio/knowledge/${result?.knowledgeId}`}>Knowledgeを見る</Link>
             </Button>
           </div>
         </DialogContent>
