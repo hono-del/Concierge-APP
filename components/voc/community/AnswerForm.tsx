@@ -3,19 +3,29 @@
 import { Award, CheckCircle2, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { submitAnswer } from "@/lib/voc/actions/community-actions";
+import { saveLocalAnswer } from "@/lib/voc/client-store";
 import { Button } from "@/components/voc/ui/button";
 import { Card } from "@/components/voc/ui/card";
 import { Textarea } from "@/components/voc/ui/textarea";
-import { submitAnswer } from "@/lib/voc/actions/community-actions";
-import type { Contributor } from "@/lib/voc/types";
+import type { Contributor, ExpertQuestion } from "@/lib/voc/types";
 
 interface AnswerFormProps {
-  questionId: string;
+  question: Pick<
+    ExpertQuestion,
+    | "id"
+    | "title"
+    | "vehicleModel"
+    | "rewardPoints"
+    | "tags"
+    | "symptoms"
+    | "conditions"
+  >;
   contributor: Contributor;
 }
 
 /** Expert Answer投稿フォーム（要件 #16）。サンプル回答者として固定Contributorを利用する。 */
-export function AnswerForm({ questionId, contributor }: AnswerFormProps) {
+export function AnswerForm({ question, contributor }: AnswerFormProps) {
   const router = useRouter();
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
@@ -25,7 +35,28 @@ export function AnswerForm({ questionId, contributor }: AnswerFormProps) {
     if (!text.trim()) return;
     setPosting(true);
     try {
-      await submitAnswer(questionId, contributor.id, text.trim());
+      const { id } = await submitAnswer(question.id, contributor.id, text.trim());
+
+      // Vercelのインスタンス間でストアが共有されないため localStorage にも保存
+      saveLocalAnswer({
+        id,
+        questionId: question.id,
+        questionTitle: question.title,
+        questionVehicleModel: question.vehicleModel,
+        questionRewardPoints: question.rewardPoints,
+        questionTags: question.tags,
+        questionSymptoms: question.symptoms,
+        questionConditions: question.conditions,
+        contributorId: contributor.id,
+        contributorName: contributor.name,
+        contributorBadge: contributor.badge,
+        contributorKnowledgeLevel: contributor.knowledgeLevel,
+        contributorPoints: contributor.points,
+        answerText: text.trim(),
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      });
+
       setPosted(true);
       router.refresh();
     } finally {

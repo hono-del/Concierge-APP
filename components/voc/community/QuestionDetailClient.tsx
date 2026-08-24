@@ -161,7 +161,7 @@ export function QuestionDetailClient({ serverQuestion, id, defaultContributor }:
         )}
       </div>
 
-      {defaultContributor && <AnswerForm questionId={question.id} contributor={defaultContributor} />}
+      {defaultContributor && <AnswerForm question={question} contributor={defaultContributor} />}
     </div>
   );
 }

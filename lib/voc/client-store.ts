@@ -8,6 +8,7 @@ import type { ExpertQuestion } from "./types";
 
 const KEYS = {
   questions: "voc_local_questions",
+  answers: "voc_local_answers",
 } as const;
 
 function read<T>(key: string): T[] {
@@ -29,8 +30,23 @@ function write<T>(key: string, data: T[]) {
   }
 }
 
+// ─── Questions ──────────────────────────────────────────────────────────────
+
 /** チャットから投稿した質問を保存する */
-export function saveLocalQuestion(q: Pick<ExpertQuestion, "id" | "title" | "vehicleModel" | "questionText" | "tags" | "rewardPoints" | "symptoms" | "conditions" | "alreadyChecked">) {
+export function saveLocalQuestion(
+  q: Pick<
+    ExpertQuestion,
+    | "id"
+    | "title"
+    | "vehicleModel"
+    | "questionText"
+    | "tags"
+    | "rewardPoints"
+    | "symptoms"
+    | "conditions"
+    | "alreadyChecked"
+  >
+) {
   const existing = read<ExpertQuestion>(KEYS.questions);
   const newQ: ExpertQuestion = {
     ...q,
@@ -50,4 +66,43 @@ export function getLocalQuestions(): ExpertQuestion[] {
 /** IDを指定して localStorage の質問を返す */
 export function getLocalQuestion(id: string): ExpertQuestion | null {
   return getLocalQuestions().find((q) => q.id === id) ?? null;
+}
+
+// ─── Answers ────────────────────────────────────────────────────────────────
+
+export interface LocalAnswer {
+  id: string;
+  questionId: string;
+  questionTitle: string;
+  questionVehicleModel: string;
+  questionRewardPoints: number;
+  questionTags: string[];
+  questionSymptoms: string[];
+  questionConditions: string[];
+  contributorId: string;
+  contributorName: string;
+  contributorBadge: string;
+  contributorKnowledgeLevel: number;
+  contributorPoints: number;
+  answerText: string;
+  status: "pending";
+  createdAt: string;
+}
+
+/** Expert Community で投稿した回答を保存する */
+export function saveLocalAnswer(a: LocalAnswer) {
+  const existing = read<LocalAnswer>(KEYS.answers);
+  // 同じ ID が既にある場合は更新しない
+  if (existing.some((e) => e.id === a.id)) return;
+  write(KEYS.answers, [a, ...existing]);
+}
+
+/** localStorage に保存された回答を返す（pending のみ） */
+export function getLocalAnswers(): LocalAnswer[] {
+  return read<LocalAnswer>(KEYS.answers).filter((a) => a.status === "pending");
+}
+
+/** IDを指定して localStorage の回答を返す */
+export function getLocalAnswer(id: string): LocalAnswer | null {
+  return read<LocalAnswer>(KEYS.answers).find((a) => a.id === id) ?? null;
 }

@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import { SourceBadge } from "@/components/voc/SourceBadge";
 import { KpiCard } from "@/components/voc/studio/KpiCard";
+import { PendingAnswersFeed } from "@/components/voc/studio/PendingAnswersFeed";
 import { Badge } from "@/components/voc/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/voc/ui/card";
 import {
@@ -154,24 +155,17 @@ export default async function StudioDashboardPage() {
             </Link>
           </CardHeader>
           <CardContent className="space-y-2 pt-0">
-            {pendingAnswers.length === 0 && (
-              <p className="py-6 text-center text-xs text-slate-400">承認待ちの回答はありません</p>
-            )}
-            {pendingAnswers.map(({ answer, question }) => (
-              <Link
-                key={answer.id}
-                href={`/studio/review/${answer.id}`}
-                className="flex items-center justify-between gap-3 rounded-md border border-slate-100 px-3 py-2 hover:border-slate-300 hover:bg-slate-50"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-900">{question.title}</p>
-                  <p className="truncate text-[11px] text-slate-400">
-                    {answer.contributor.name} ・ {answer.contributor.badge}
-                  </p>
-                </div>
-                <Badge variant="warning">Pending</Badge>
-              </Link>
-            ))}
+            <PendingAnswersFeed
+              initialItems={pendingAnswers.map(({ answer, question }) => ({
+                answerId: answer.id,
+                answerText: answer.answerText,
+                contributorName: answer.contributor.name,
+                contributorBadge: answer.contributor.badge,
+                questionTitle: question.title,
+                questionRewardPoints: question.rewardPoints,
+                createdAt: answer.createdAt,
+              }))}
+            />
           </CardContent>
         </Card>
       </div>
