@@ -113,3 +113,12 @@ export function getLocalAnswers(): LocalAnswer[] {
 export function getLocalAnswer(id: string): LocalAnswer | null {
   return read<LocalAnswer>(KEYS.answers).find((a) => a.id === id) ?? null;
 }
+
+/** localStorage で accepted としてマーク済みの回答IDセットを返す */
+export function getAcceptedLocalAnswerIds(): Set<string> {
+  return new Set(
+    read<LocalAnswer>(KEYS.answers)
+      .filter((a) => a.status === "accepted")
+      .map((a) => a.id)
+  );
+}

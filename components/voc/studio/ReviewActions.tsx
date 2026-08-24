@@ -34,7 +34,7 @@ export function ReviewActions({ answerId, answerText, contributorName }: ReviewA
       // localStorage の回答を accepted に更新して Pending から除外する
       markLocalAnswerAccepted(answerId);
       setResult({ knowledgeId: res.knowledgeId, points: res.rewardPoints });
-      router.refresh();
+      // router.refresh は不要（Dashboard 遷移時に再フェッチされる）
     } finally {
       setBusy(false);
     }

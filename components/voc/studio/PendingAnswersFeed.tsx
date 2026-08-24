@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Award, Clock } from "lucide-react";
 import Link from "next/link";
-import { getLocalAnswers, type LocalAnswer } from "@/lib/voc/client-store";
+import { getAcceptedLocalAnswerIds, getLocalAnswers, type LocalAnswer } from "@/lib/voc/client-store";
 import { Badge } from "@/components/voc/ui/badge";
 import { Card, CardContent } from "@/components/voc/ui/card";
 import { formatRelativeDate } from "@/lib/voc/labels";
@@ -38,13 +38,17 @@ export function PendingAnswersFeed({ initialItems }: PendingAnswersFeedProps) {
   const [items, setItems] = useState<PendingItem[]>(initialItems);
 
   useEffect(() => {
-    const local = getLocalAnswers().map(toItem);
-    if (local.length === 0) return;
-    const existingIds = new Set(initialItems.map((i) => i.answerId));
-    const newOnes = local.filter((l) => !existingIds.has(l.answerId));
-    if (newOnes.length > 0) {
-      setItems([...newOnes, ...initialItems]);
-    }
+    const acceptedIds = getAcceptedLocalAnswerIds();
+    const localPending = getLocalAnswers().map(toItem);
+
+    // サーバーデータから accepted 済みを除外
+    const serverFiltered = initialItems.filter((i) => !acceptedIds.has(i.answerId));
+
+    // localStorage の新しい pending 回答をマージ（サーバーに既にある ID は除外）
+    const existingIds = new Set(serverFiltered.map((i) => i.answerId));
+    const newOnes = localPending.filter((l) => !existingIds.has(l.answerId));
+
+    setItems([...newOnes, ...serverFiltered]);
   }, [initialItems]);
 
   if (items.length === 0) {
