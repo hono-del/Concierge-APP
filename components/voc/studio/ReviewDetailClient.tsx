@@ -9,8 +9,7 @@ import { TrustBadge } from "@/components/voc/TrustBadge";
 import { ReviewActions } from "@/components/voc/studio/ReviewActions";
 import { Badge } from "@/components/voc/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/voc/ui/card";
-import { detectQuickCategory } from "@/lib/voc/ai/chat-engine";
-import { buildStructuredFromExpertAnswer, detectSafetyLevel } from "@/lib/voc/ai/structuring";
+import { buildStructuredFromExpertAnswer, detectQuickCategory, detectSafetyLevel } from "@/lib/voc/ai/pure-utils";
 import { getLocalAnswer, type LocalAnswer } from "@/lib/voc/client-store";
 import { CATEGORY_LABELS } from "@/lib/voc/labels";
 

@@ -1,6 +1,5 @@
 import { ReviewDetailClient } from "@/components/voc/studio/ReviewDetailClient";
-import { detectQuickCategory } from "@/lib/voc/ai/chat-engine";
-import { buildStructuredFromExpertAnswer, detectSafetyLevel } from "@/lib/voc/ai/structuring";
+import { buildStructuredFromExpertAnswer, detectQuickCategory, detectSafetyLevel } from "@/lib/voc/ai/pure-utils";
 import {
   getExpertAnswerDetail,
   getOfficialKnowledgeByCategory,

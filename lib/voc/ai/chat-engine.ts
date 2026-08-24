@@ -1,5 +1,7 @@
 import { getKnowledge } from "../data/queries";
 import { prisma } from "../prisma";
+import { detectQuickCategory } from "./pure-utils";
+export { detectQuickCategory };
 import type {
   ChatAnswer,
   ChatContext,
@@ -132,16 +134,6 @@ const WARNING_KEYWORDS = ["警告灯", "警告ランプ"];
 
 function normalize(text: string): string {
   return text.toLowerCase();
-}
-
-export function detectQuickCategory(text: string): KnowledgeCategory | null {
-  const t = normalize(text);
-  if (DOOR_KEYWORDS.some((k) => t.includes(k))) return "door";
-  if (NOISE_KEYWORDS.some((k) => t.includes(k))) return "noise";
-  if (BATTERY_KEYWORDS.some((k) => t.includes(k))) return "battery";
-  if (INFOTAINMENT_KEYWORDS.some((k) => t.includes(k))) return "infotainment";
-  if (WARNING_KEYWORDS.some((k) => t.includes(k))) return "warning";
-  return null;
 }
 
 function isHeroDoorTrigger(text: string): boolean {
