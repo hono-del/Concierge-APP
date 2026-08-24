@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import {
   askQuickCategory,
   continueConversation,
@@ -50,5 +51,6 @@ export async function submitExpertQuestion(draft: ExpertQuestionDraftInput) {
       status: "open",
     },
   });
+  revalidatePath("/community");
   return { id: created.id };
 }
